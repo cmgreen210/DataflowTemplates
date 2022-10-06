@@ -54,10 +54,10 @@ public class BigQueryToTFRecord {
    * handles {@link GenericData.Array} that are passed into the {@link
    * BigQueryToTFRecord#buildFeature} method creating a TensorFlow feature from the record.
    */
-  private static final String TRAIN = "train/";
+  private static final String TRAIN = "Split-train/";
 
-  private static final String TEST = "test/";
-  private static final String VAL = "val/";
+  private static final String TEST = "Split-eval/";
+  private static final String VAL = "Split-val/";
 
   private static void buildFeatureFromIterator(
       Class<?> fieldType, Object field, Feature.Builder feature) {
