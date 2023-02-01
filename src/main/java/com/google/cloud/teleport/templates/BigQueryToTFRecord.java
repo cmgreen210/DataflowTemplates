@@ -26,6 +26,7 @@ import org.apache.avro.util.Utf8;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.ByteArrayCoder;
+import org.apache.beam.sdk.io.Compression;
 import org.apache.beam.sdk.io.FileIO;
 import org.apache.beam.sdk.io.TFRecordIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
@@ -270,7 +271,9 @@ public class BigQueryToTFRecord {
                     ValueProvider.NestedValueProvider.of(
                         options.getOutputDirectory(), dir -> concatURI(dir, TRAIN)))
                 .withNumShards(0)
-                .withSuffix(options.getOutputSuffix()));
+                .withSuffix(options.getOutputSuffix())
+                .withCompression(options.getCompression().get())
+        );
 
     partitionedExamples
         .get(1)
@@ -282,7 +285,9 @@ public class BigQueryToTFRecord {
                     ValueProvider.NestedValueProvider.of(
                         options.getOutputDirectory(), dir -> concatURI(dir, TEST)))
                 .withNumShards(0)
-                .withSuffix(options.getOutputSuffix()));
+                .withSuffix(options.getOutputSuffix())
+                .withCompression(options.getCompression().get())
+        );
 
     partitionedExamples
         .get(2)
@@ -294,7 +299,9 @@ public class BigQueryToTFRecord {
                     ValueProvider.NestedValueProvider.of(
                         options.getOutputDirectory(), dir -> concatURI(dir, VAL)))
                 .withNumShards(0)
-                .withSuffix(options.getOutputSuffix()));
+                .withSuffix(options.getOutputSuffix())
+                .withCompression(options.getCompression().get())
+        );
 
     return pipeline.run();
   }
@@ -328,6 +335,10 @@ public class BigQueryToTFRecord {
     @Description("The validation percentage split for TFRecord Files")
     @Default.Float(0)
     ValueProvider<Float> getValidationPercentage();
+
+    @Description("The output compression type.")
+    @Default.Enum("UNCOMPRESSED")
+    ValueProvider<Compression> getCompression();
 
     void setValidationPercentage(ValueProvider<Float> validationPercentage);
   }
