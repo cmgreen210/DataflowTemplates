@@ -272,7 +272,7 @@ public class BigQueryToTFRecord {
                         options.getOutputDirectory(), dir -> concatURI(dir, TRAIN)))
                 .withNumShards(0)
                 .withSuffix(options.getOutputSuffix())
-                .withCompression(options.getCompression().get())
+                .withCompression(options.getCompression())
         );
 
     partitionedExamples
@@ -286,7 +286,7 @@ public class BigQueryToTFRecord {
                         options.getOutputDirectory(), dir -> concatURI(dir, TEST)))
                 .withNumShards(0)
                 .withSuffix(options.getOutputSuffix())
-                .withCompression(options.getCompression().get())
+                .withCompression(options.getCompression())
         );
 
     partitionedExamples
@@ -300,7 +300,7 @@ public class BigQueryToTFRecord {
                         options.getOutputDirectory(), dir -> concatURI(dir, VAL)))
                 .withNumShards(0)
                 .withSuffix(options.getOutputSuffix())
-                .withCompression(options.getCompression().get())
+                .withCompression(options.getCompression())
         );
 
     return pipeline.run();
@@ -340,8 +340,8 @@ public class BigQueryToTFRecord {
 
     @Description("The output compression type.")
     @Default.Enum("UNCOMPRESSED")
-    ValueProvider<Compression> getCompression();
+    Compression getCompression();
 
-    void setCompression(ValueProvider<Compression> compression);
+    void setCompression(Compression compression);
   }
 }
