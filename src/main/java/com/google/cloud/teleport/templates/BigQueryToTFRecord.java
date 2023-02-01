@@ -336,10 +336,12 @@ public class BigQueryToTFRecord {
     @Default.Float(0)
     ValueProvider<Float> getValidationPercentage();
 
+    void setValidationPercentage(ValueProvider<Float> validationPercentage);
+
     @Description("The output compression type.")
     @Default.Enum("UNCOMPRESSED")
     ValueProvider<Compression> getCompression();
 
-    void setValidationPercentage(ValueProvider<Float> validationPercentage);
+    void setCompression(ValueProvider<Compression> compression);
   }
 }
