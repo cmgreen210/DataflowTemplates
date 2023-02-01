@@ -272,7 +272,7 @@ public class BigQueryToTFRecord {
                         options.getOutputDirectory(), dir -> concatURI(dir, TRAIN)))
                 .withNumShards(0)
                 .withSuffix(options.getOutputSuffix())
-                .withCompression(options.getCompression())
+                .withCompression(Compression.valueOf(options.getCompression().get()))
         );
 
     partitionedExamples
@@ -286,7 +286,7 @@ public class BigQueryToTFRecord {
                         options.getOutputDirectory(), dir -> concatURI(dir, TEST)))
                 .withNumShards(0)
                 .withSuffix(options.getOutputSuffix())
-                .withCompression(options.getCompression())
+                .withCompression(Compression.valueOf(options.getCompression().get()))
         );
 
     partitionedExamples
@@ -300,7 +300,7 @@ public class BigQueryToTFRecord {
                         options.getOutputDirectory(), dir -> concatURI(dir, VAL)))
                 .withNumShards(0)
                 .withSuffix(options.getOutputSuffix())
-                .withCompression(options.getCompression())
+                .withCompression(Compression.valueOf(options.getCompression().get()))
         );
 
     return pipeline.run();
@@ -339,9 +339,9 @@ public class BigQueryToTFRecord {
     void setValidationPercentage(ValueProvider<Float> validationPercentage);
 
     @Description("The output compression type.")
-    @Default.Enum("UNCOMPRESSED")
-    Compression getCompression();
+    @Default.String("UNCOMPRESSED")
+    ValueProvider<String> getCompression();
 
-    void setCompression(Compression compression);
+    void setCompression(String compression);
   }
 }
