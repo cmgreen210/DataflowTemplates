@@ -342,6 +342,6 @@ public class BigQueryToTFRecord {
     @Default.String("UNCOMPRESSED")
     ValueProvider<String> getCompression();
 
-    void setCompression(String compression);
+    void setCompression(ValueProvider<String> compression);
   }
 }
