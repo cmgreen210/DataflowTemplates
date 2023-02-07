@@ -16,6 +16,8 @@
 package com.google.cloud.teleport.templates;
 
 import com.google.api.services.bigquery.model.TableFieldSchema;
+import com.google.cloud.teleport.util.DualInputNestedValueProvider;
+import com.google.cloud.teleport.util.DualInputNestedValueProvider.TranslatorInput;
 import com.google.cloud.teleport.templates.common.BigQueryConverters.BigQueryReadOptions;
 import com.google.protobuf.ByteString;
 import java.util.Iterator;
@@ -37,6 +39,7 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.Partition;
 import org.apache.beam.sdk.transforms.Reshuffle;
+import org.apache.beam.sdk.transforms.SerializableFunction;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionList;
 import org.apache.beam.vendor.guava.v26_0_jre.com.google.common.annotations.VisibleForTesting;
@@ -55,10 +58,7 @@ public class BigQueryToTFRecord {
    * handles {@link GenericData.Array} that are passed into the {@link
    * BigQueryToTFRecord#buildFeature} method creating a TensorFlow feature from the record.
    */
-  private static final String TRAIN = "Split-train/";
 
-  private static final String TEST = "Split-eval/";
-  private static final String VAL = "Split-val/";
 
   private static void buildFeatureFromIterator(
       Class<?> fieldType, Object field, Feature.Builder feature) {
@@ -183,40 +183,16 @@ public class BigQueryToTFRecord {
     }
   }
 
-  /**
-   * The {@link BigQueryToTFRecord#applyTrainTestValSplit} method transforms the PCollection by
-   * randomly partitioning it into PCollections for each dataset.
-   */
-  static PCollectionList<byte[]> applyTrainTestValSplit(
-      PCollection<byte[]> input,
-      ValueProvider<Float> trainingPercentage,
-      ValueProvider<Float> testingPercentage,
-      ValueProvider<Float> validationPercentage,
-      Random rand) {
-    return input.apply(
-        Partition.of(
-            3,
-            (Partition.PartitionFn<byte[]>)
-                (number, numPartitions) -> {
-                  Float train = trainingPercentage.get();
-                  Float test = testingPercentage.get();
-                  Float validation = validationPercentage.get();
-                  Double d = rand.nextDouble();
-                  if (train + test + validation != 1) {
-                    throw new RuntimeException(
-                        String.format(
-                            "Train %.2f, Test %.2f, Validation"
-                                + " %.2f percentages must add up to 100 percent",
-                            train, test, validation));
-                  }
-                  if (d < train) {
-                    return 0;
-                  } else if (d >= train && d < train + test) {
-                    return 1;
-                  } else {
-                    return 2;
-                  }
-                }));
+  private static ValueProvider<String> createURI(ValueProvider<String> base, ValueProvider<String> subdir) {
+    return DualInputNestedValueProvider.of(
+            base,
+            subdir,
+            new SerializableFunction<TranslatorInput<String, String>, String>() {
+              @Override
+              public String apply(TranslatorInput<String, String> input) {
+                return concatURI(input.getX(), input.getY());
+              }
+            });
   }
 
   /** Run the pipeline. */
@@ -250,58 +226,18 @@ public class BigQueryToTFRecord {
                     .usingStandardSql()
                     .withMethod(BigQueryIO.TypedRead.Method.DIRECT_READ)
                 // Enable BigQuery Storage API
-                )
-            .apply("ReshuffleResults", Reshuffle.viaRandomKey());
+                );
 
-    PCollectionList<byte[]> partitionedExamples =
-        applyTrainTestValSplit(
-            bigQueryToExamples,
-            options.getTrainingPercentage(),
-            options.getTestingPercentage(),
-            options.getValidationPercentage(),
-            rand);
-
-    partitionedExamples
-        .get(0)
-        .apply(
-            "WriteTFTrainingRecord",
-            FileIO.<byte[]>write()
-                .via(TFRecordIO.sink())
-                .to(
-                    ValueProvider.NestedValueProvider.of(
-                        options.getOutputDirectory(), dir -> concatURI(dir, TRAIN)))
-                .withNumShards(0)
-                .withSuffix(options.getOutputSuffix())
-                .withCompression(Compression.GZIP)
-        );
-
-    partitionedExamples
-        .get(1)
-        .apply(
-            "WriteTFTestingRecord",
-            FileIO.<byte[]>write()
-                .via(TFRecordIO.sink())
-                .to(
-                    ValueProvider.NestedValueProvider.of(
-                        options.getOutputDirectory(), dir -> concatURI(dir, TEST)))
-                .withNumShards(0)
-                .withSuffix(options.getOutputSuffix())
-                .withCompression(Compression.GZIP)
-        );
-
-    partitionedExamples
-        .get(2)
-        .apply(
-            "WriteTFValidationRecord",
-            FileIO.<byte[]>write()
-                .via(TFRecordIO.sink())
-                .to(
-                    ValueProvider.NestedValueProvider.of(
-                        options.getOutputDirectory(), dir -> concatURI(dir, VAL)))
-                .withNumShards(0)
-                .withSuffix(options.getOutputSuffix())
-                .withCompression(Compression.GZIP)
-        );
+    bigQueryToExamples
+	    .apply(
+             "WriteTFRecords",
+	     FileIO.<byte[]>write()
+		.via(TFRecordIO.sink())
+		.to(createURI(options.getOutputDirectory(), options.getOutputSubdir()))
+		.withNumShards(0)
+		.withSuffix(options.getOutputSuffix())
+		.withCompression(Compression.GZIP)
+             );
 
     return pipeline.run();
   }
@@ -320,22 +256,11 @@ public class BigQueryToTFRecord {
 
     void setOutputSuffix(ValueProvider<String> outputSuffix);
 
-    @Description("The training percentage split for TFRecord Files")
-    @Default.Float(1)
-    ValueProvider<Float> getTrainingPercentage();
 
-    void setTrainingPercentage(ValueProvider<Float> trainingPercentage);
+    @Description("The subdir to append to output path.")
+    @Default.String("Split-train")
+    ValueProvider<String> getOutputSubdir();
+    void setOutputSubdir(ValueProvider<String> outputSubdir);
 
-    @Description("The testing percentage split for TFRecord Files")
-    @Default.Float(0)
-    ValueProvider<Float> getTestingPercentage();
-
-    void setTestingPercentage(ValueProvider<Float> testingPercentage);
-
-    @Description("The validation percentage split for TFRecord Files")
-    @Default.Float(0)
-    ValueProvider<Float> getValidationPercentage();
-
-    void setValidationPercentage(ValueProvider<Float> validationPercentage);
   }
 }
